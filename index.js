@@ -18,7 +18,11 @@
 //                       `=---='
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const server = require("./src/app.js");
-const { getAllTypes } = require("./src/controllers/typeController.js");
+const {
+  loadPokemonsFromApi,
+} = require("./src/controllers/pokemonController.js");
+const { loadTypesFromApi } = require("./src/controllers/typeController.js");
+
 const { conn } = require("./src/db.js");
 require("dotenv").config();
 const port = process.env.PORT ?? 8080;
@@ -27,6 +31,7 @@ const port = process.env.PORT ?? 8080;
 conn.sync({ force: true }).then(() => {
   server.listen(port, async () => {
     console.log(`%s listening at ${port}`); // eslint-disable-line no-console
-    await getAllTypes();
+    await loadTypesFromApi();
+    await loadPokemonsFromApi();
   });
 });
