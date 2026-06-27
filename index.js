@@ -28,7 +28,7 @@ require("dotenv").config();
 const port = process.env.PORT ?? 8080;
 
 // Syncing all the models at once.
-conn.sync({ force: true }).then(() => {
+conn.sync({ alter: true }).then(() => {
   server.listen(port, async () => {
     console.log(`%s listening at ${port}`); // eslint-disable-line no-console
     await loadTypesFromApi();
