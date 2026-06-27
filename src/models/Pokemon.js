@@ -7,9 +7,10 @@ module.exports = (sequelize) => {
     "pokemon",
     {
       id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
         primaryKey: true,
-        autoIncrement: true,
       },
       name: {
         type: DataTypes.STRING,
@@ -37,10 +38,10 @@ module.exports = (sequelize) => {
       img: {
         type: DataTypes.STRING,
       },
-      fromApi: {
+      createdInDb: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
-        defaultValue: false,
+        defaultValue: true,
       },
     },
     {

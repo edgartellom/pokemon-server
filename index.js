@@ -18,9 +18,6 @@
 //                       `=---='
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const server = require("./src/app.js");
-const {
-  loadPokemonsFromApi,
-} = require("./src/controllers/pokemonController.js");
 const { loadTypesFromApi } = require("./src/controllers/typeController.js");
 
 const { conn } = require("./src/db.js");
@@ -32,6 +29,5 @@ conn.sync({ alter: true }).then(() => {
   server.listen(port, async () => {
     console.log(`%s listening at ${port}`); // eslint-disable-line no-console
     await loadTypesFromApi();
-    await loadPokemonsFromApi();
   });
 });

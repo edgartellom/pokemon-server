@@ -2,10 +2,14 @@ const axios = require("axios");
 const { Type } = require("../db");
 require("dotenv").config();
 const apiUrl = process.env.API_URL;
+const initialType = 0;
+const TypeQty = 24;
 
 const loadTypesFromApi = async () => {
   // get types from API
-  let allTypes = (await axios(`${apiUrl}/type`)).data.results;
+  let allTypes = (
+    await axios(`${apiUrl}/type?offset=${initialType}&limit=${TypeQty}`)
+  ).data.results;
   allTypes = allTypes.map((e) => e.name);
 
   let createdCount = 0;
@@ -28,11 +32,6 @@ const loadTypesFromApi = async () => {
   console.log(`${foundCount} types found in DB`);
 };
 
-const getAllTypes = async () => {
-  return await Type.findAll();
-};
-
 module.exports = {
   loadTypesFromApi,
-  getAllTypes,
 };

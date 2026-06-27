@@ -1,78 +1,173 @@
 const axios = require("axios");
 const { Pokemon, Type } = require("../db");
+const { parsePokeInfo, parsePokemon, validateImage } = require("./utils");
 require("dotenv").config();
-const apiUrl = process.env.API_URL;
-const initialPokemon = 0;
-const pokemonAmount = 1350;
-const pokemonPlaceholder =
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png";
 
-const loadPokemonsFromApi = async () => {
-  // get pokemons from API
-  const response = await axios(
-    `${apiUrl}/pokemon?offset=${initialPokemon}&limit=${pokemonAmount}`,
-  );
+const pokemonUrl = process.env.API_URL;
 
-  // parse and save pokemons in DB
-  let createdCount = 0;
-  let foundCount = 0;
+let cachedApi = null;
+let cachedApiCount = null;
 
-  for (const pokemonInfo of response.data.results) {
-    let { name, stats, height, weight, sprites, types } = (
-      await axios(pokemonInfo.url)
-    ).data;
+const getApiData = async () => {
+  if (cachedApi) return cachedApi;
 
-    const typeNames = types.map((t) => t.type.name);
-    const hp = stats.find((e) => e.stat.name === "hp").base_stat;
-    const attack = stats.find((e) => e.stat.name === "attack").base_stat;
-    const defense = stats.find((e) => e.stat.name === "defense").base_stat;
-    const speed = stats.find((e) => e.stat.name === "speed").base_stat;
-    const img = sprites.front_default || pokemonPlaceholder;
+  const { data } = await axios.get(`${pokemonUrl}/pokemon?limit=2000`);
 
-    const [pokemon, created] = await Pokemon.findOrCreate({
-      where: { name },
-      defaults: {
-        name,
-        hp,
-        attack,
-        defense,
-        speed,
-        height,
-        weight,
-        img,
-        fromApi: true,
-      },
-    });
+  const results = await parsePokeInfo(data.results);
 
-    let typeDb = await Type.findAll({
-      where: { name: typeNames },
-    });
-    await pokemon.addTypes(typeDb);
+  cachedApi = results;
+  cachedApiCount = data.count;
 
-    if (created) {
-      createdCount++;
-    } else {
-      foundCount++;
-    }
-  }
-
-  console.log(`${createdCount} pokemons created`);
-  console.log(`${foundCount} pokemons found in DB`);
+  return results;
 };
 
-const getAllPokemons = async () => {
+const getDbData = async () => {
   return await Pokemon.findAll({
-    include: [
-      {
-        model: Type,
-        attributes: ["name"],
-        through: { attributes: [] },
+    include: {
+      model: Type,
+      attributes: ["name"],
+      through: { attributes: [] },
+    },
+  });
+};
+
+const getAllPokemons = async (query) => {
+  let {
+    page = 1,
+    limit = 12,
+    name,
+    type,
+    source, // "api" | "db" | undefined
+    sort, // "name" | "attack"
+    order = "asc",
+  } = query;
+
+  page = Number(page);
+  limit = Number(limit);
+
+  const [dbData, apiData] = await Promise.all([getDbData(), getApiData()]);
+
+  let data = [...dbData, ...apiData];
+
+  // ======================
+  // SEARCH BY NAME
+  // ======================
+  if (name) {
+    data = data.filter((p) =>
+      p.name.toLowerCase().includes(name.toLowerCase()),
+    );
+  }
+
+  // ======================
+  // FILTER BY TYPE
+  // ======================
+  if (type) {
+    data = data.filter((p) => p.types?.some((t) => t.name === type));
+  }
+
+  // ======================
+  // FILTER BY ORIGIN
+  // ======================
+  if (source === "created") {
+    data = data.filter((p) => p.createdInDb);
+  }
+
+  if (source === "api") {
+    data = data.filter((p) => !p.createdInDb);
+  }
+
+  // ======================
+  // SORT
+  // ======================
+  if (sort) {
+    data.sort((a, b) => {
+      const aVal = a[sort];
+      const bVal = b[sort];
+
+      if (order === "desc") {
+        return aVal < bVal ? 1 : -1;
+      }
+      return aVal > bVal ? 1 : -1;
+    });
+  }
+
+  // ======================
+  // PAGINATION
+  // ======================
+  const start = (page - 1) * limit;
+  const end = start + limit;
+
+  const paginated = data.slice(start, end);
+
+  return {
+    page,
+    limit,
+    count: data.length,
+    totalPages: Math.ceil(data.length / limit),
+    results: paginated,
+  };
+};
+
+const getPokemonById = async (id) => {
+  if (!isNaN(id)) {
+    const { data } = await axios.get(`${pokemonUrl}/pokemon/${id}`);
+    return parsePokemon(data);
+  }
+
+  return await Pokemon.findByPk(id, {
+    include: {
+      model: Type,
+      attributes: ["name"],
+      through: { attributes: [] },
+    },
+  });
+};
+
+const createPokemon = async ({
+  name,
+  hp,
+  attack,
+  defense,
+  speed,
+  height,
+  weight,
+  img,
+  type,
+}) => {
+  img = await validateImage(img);
+
+  const pokemon = await Pokemon.create({
+    name,
+    hp,
+    attack,
+    defense,
+    speed,
+    height,
+    weight,
+    img,
+  });
+
+  const types = await Type.findAll({
+    where: {
+      name: type,
+    },
+  });
+
+  await pokemon.addTypes(types);
+
+  return await Pokemon.findByPk(pokemon.id, {
+    include: {
+      model: Type,
+      attributes: ["name"],
+      through: {
+        attributes: [],
       },
-    ],
+    },
   });
 };
 
 module.exports = {
-  loadPokemonsFromApi,
   getAllPokemons,
+  getPokemonById,
+  createPokemon,
 };

@@ -1,42 +1,35 @@
 const { Router } = require("express");
-const { getAllPokemons } = require("../controllers/pokemonController");
+const {
+  getAllPokemons,
+  getPokemonById,
+  getPokemonByName,
+  createPokemon,
+} = require("../controllers/pokemonController");
 const { Pokemon, Type } = require("../db");
 const axios = require("axios");
-const { validateImage } = require("./utils");
-// Importar todos los routers;
-// Ejemplo: const authRouter = require('./auth.js');
 
 const router = Router();
 
 router.get("/", async (req, res, next) => {
   try {
-    const { name } = req.query;
-    let pokemonsTotal = await getAllPokemons();
-    if (name) {
-      let pokemonName = await pokemonsTotal.filter((e) =>
-        e.name.toLowerCase().includes(name.toLowerCase()),
-      );
-      pokemonName.length
-        ? res.status(200).send(pokemonName)
-        : res.status(404).send("Pokemon not found!");
-    } else {
-      res.status(200).send(pokemonsTotal);
-    }
-  } catch (error) {
-    next(error);
+    const result = await getAllPokemons(req.query);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
   }
 });
 
 router.get("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    let pokemonsTotal = await getAllPokemons();
-    if (id) {
-      let pokemonId = await pokemonsTotal.filter((e) => e.id == id);
-      pokemonId.length
-        ? res.status(200).send(pokemonId)
-        : res.status(404).send("Pokemon not found!");
+
+    const pokemon = await getPokemonById(id);
+
+    if (!pokemon) {
+      return res.status(404).send("Pokemon not found!");
     }
+
+    res.status(200).json(pokemon);
   } catch (error) {
     next(error);
   }
@@ -44,28 +37,8 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    let { name, hp, attack, defense, speed, height, weight, img, type } =
-      req.body;
-
-    img = await validateImage(img);
-
-    let pokemonCreated = await Pokemon.create({
-      name,
-      hp,
-      attack,
-      defense,
-      speed,
-      height,
-      weight,
-      img,
-    });
-
-    let typeDb = await Type.findAll({
-      where: { name: type },
-    });
-    await pokemonCreated.addTypes(typeDb);
-
-    res.send("Pokemon created succesfully!");
+    const pokemon = await createPokemon(req.body);
+    res.status(201).json(pokemon);
   } catch (error) {
     next(error);
   }
@@ -74,17 +47,16 @@ router.post("/", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
-    let pokemonsTotal = await getAllPokemons();
-    if (id) {
-      let pokemonId = await pokemonsTotal.filter((e) => e.id == id);
-      await Pokemon.destroy({
-        where: { id: id },
-      });
-      pokemonId.length
-        ? res.status(200).send(pokemonId)
-        : res.status(404).send("Pokemon not found!");
+
+    const pokemon = await Pokemon.findByPk(id);
+
+    if (!pokemon) {
+      return res.status(404).send("Pokemon not found!");
     }
-    pokemonsTotal = pokemonsTotal.filter((e) => e.id != id);
+
+    await pokemon.destroy();
+
+    res.status(200).json(pokemon);
   } catch (error) {
     next(error);
   }
